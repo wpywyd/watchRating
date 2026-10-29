@@ -30,6 +30,8 @@ Configuration options:
 
 The provider must implement `/chat/completions` with image input and strict `json_schema` response formatting. Allow the provider host (default `api.openai.com`) in environment network settings. The start scripts enable Node’s environment proxy support so inherited HTTPS proxy and CA settings are respected. The supplied key stays server-side. Without a key, upload and camera capture remain available and scoring is explicitly disabled; no fake ratings are generated.
 
+The AI identifies the stage (sketch, model/prototype, or apparently finished watch) from the photo; students do not select it. The detected stage and visual reasoning appear in the review and downloaded feedback. If the stage cannot be determined, the AI reports uncertainty instead of forcing a choice. Stage detection and scoring share one AI request.
+
 The four criteria contribute equally. Each score is 1–100 and the final score is their rounded mean. Non-watch submissions receive a request for a different photo instead of a score. Feedback highlights uncertainty; photos cannot establish comfort, durability, or functioning mechanisms. AI feedback is advisory, not a formal grade.
 
 Photos and notes are processed in memory and are not saved by this app. On submission, they are sent to the configured AI provider, whose retention policy applies. Avoid student names and faces. Uploaded image metadata is not copied into the re-encoded JPEG.

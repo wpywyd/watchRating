@@ -3,3 +3,5 @@
 
 /* Keep enlarged labels comfortable on narrow screens. */
 .hero-foot{flex-wrap:wrap;row-gap:10px}.small-tag{max-width:48%;text-align:right;line-height:1.5}.field-label{line-height:1.5}.stage-options span{line-height:1.5}.preview-bar{min-width:0}.empty-criteria span{line-height:1.5}@media(max-width:900px){.stage-options{flex-wrap:wrap}.stage-options label{flex:1 1 100px}.card-heading{flex-wrap:wrap}}@media(max-width:640px){.hero-foot{gap:12px}.eyebrow{line-height:1.6}.nav-link{gap:8px}.rubric-grid{grid-template-columns:1fr}.rubric-grid article{padding:0;border-right:0}.rubric-grid p{max-width:none}.empty-criteria{gap:8px}}
+
+.auto-stage-note{font-size:14px;line-height:1.7;color:var(--green);margin:20px 0}.detected-stage{border:1px solid #ccd6bc;border-radius:5px;padding:13px 15px;margin:16px 0}.detected-stage strong{font-size:14px;font-weight:600}.detected-stage p{font-size:13px;line-height:1.7;color:#68725f;margin:8px 0 0}

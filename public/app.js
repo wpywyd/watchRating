@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 let photo = null, stream = null, configured = false, busy = false, selection = 0, latest = null;
+const stages = { sketch: 'Sketch', model: 'Model / prototype', finished: 'Finished watch', unclear: 'Stage unclear' };
 const names = { creativity: 'Creativity', appearance: 'Appearance', practicality: 'Practicality', craftsmanship: 'Craftsmanship' };
 function error(message) { $('form-error').textContent = message; $('form-error').hidden = !message; }
 function updateButton() { $('rate').disabled = !photo || !configured || busy; }
@@ -48,19 +49,20 @@ function render(result) {
   const root = $('result-content'); root.replaceChildren(); $('result-empty').hidden = true; root.hidden = false;
   if (!result.assessable) { root.append(element('h3', 'Let’s try another photo.'), element('p', result.reason, 'result-summary')); return; }
   root.append(element('p', 'YOUR DESIGN, SEEN WITH FRESH EYES', 'result-overline'));
+  const stage = element('div', undefined, 'detected-stage'); stage.append(element('strong', 'AI-detected stage: ' + stages[result.detectedStage]), element('p', result.stageReason)); root.append(stage);
   const score = element('div', undefined, 'score-line'); score.append(element('strong', result.score), element('span', '/ 100')); root.append(score, element('p', 'AI FEEDBACK · FOUR EQUALLY WEIGHTED CRITERIA', 'result-label'), element('p', result.summary, 'result-summary'));
   for (const [key, name] of Object.entries(names)) { const rating = result.ratings[key]; const row = element('div', undefined, 'rating-row'); const title = element('div', undefined, 'rating-title'); title.append(element('span', name), element('b', rating.score + ' / 100')); const meter = element('div', undefined, 'meter'); const progress = element('progress'); progress.max = 100; progress.value = rating.score; progress.setAttribute('aria-label', name); meter.append(progress); row.append(title, meter, element('p', rating.feedback)); root.append(row); }
   for (const [key, title] of [['strengths', '✳ What’s working'], ['nextSteps', '↗ Ideas for your next version']]) { const block = element('div', undefined, 'feedback-block'); block.append(element('h4', title)); const list = element('ul'); for (const item of result[key]) list.append(element('li', item)); block.append(list); root.append(block); }
   root.append(element('p', result.limitations + ' AI feedback is a starting point, not a formal grade. Discuss it with your teacher.', 'limits'));
   const actions = element('div', undefined, 'result-actions'); const save = element('button', 'Save feedback ↓', 'dark-button'); save.type = 'button'; save.addEventListener('click', download); const print = element('button', 'Print review ↗', 'text-button'); print.type = 'button'; print.addEventListener('click', () => window.print()); actions.append(save, print); root.append(actions);
 }
-function download() { if (!latest?.assessable) return; const lines = ['WATCH STUDIO — AI design feedback', `Score: ${latest.score}/100`, latest.summary, ...Object.entries(names).map(([k, n]) => `${n}: ${latest.ratings[k].score}/100\n${latest.ratings[k].feedback}`), 'WHAT’S WORKING', ...latest.strengths, 'NEXT STEPS', ...latest.nextSteps, latest.limitations, 'AI feedback is not a formal grade.']; const url = URL.createObjectURL(new Blob([lines.join('\n\n')], { type: 'text/plain' })); const link = element('a'); link.href = url; link.download = 'my-watch-feedback.txt'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+function download() { if (!latest?.assessable) return; const lines = ['WATCH STUDIO — AI design feedback', `Score: ${latest.score}/100`, `AI-detected stage: ${stages[latest.detectedStage]}`, latest.stageReason, latest.summary, ...Object.entries(names).map(([k, n]) => `${n}: ${latest.ratings[k].score}/100\n${latest.ratings[k].feedback}`), 'WHAT’S WORKING', ...latest.strengths, 'NEXT STEPS', ...latest.nextSteps, latest.limitations, 'AI feedback is not a formal grade.']; const url = URL.createObjectURL(new Blob([lines.join('\n\n')], { type: 'text/plain' })); const link = element('a'); link.href = url; link.download = 'my-watch-feedback.txt'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 $('design-form').addEventListener('submit', async (e) => {
   e.preventDefault(); if (!photo || busy || !configured) return; busy = true; stopCamera(); error(''); updateButton();
   $('result-empty').hidden = true; $('result-content').hidden = true; $('result-loading').hidden = false;
   const controls = [...$('design-form').querySelectorAll('button,input,textarea')]; controls.forEach(c => c.disabled = true);
   if (window.innerWidth < 641) $('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  try { const response = await fetch('/api/rate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: photo, notes: $('notes').value, medium: document.querySelector('[name=medium]:checked').value }), signal: AbortSignal.timeout(70000) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'The assessment could not be completed.'); latest = data; render(data); }
+  try { const response = await fetch('/api/rate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: photo, notes: $('notes').value }), signal: AbortSignal.timeout(70000) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'The assessment could not be completed.'); latest = data; render(data); }
   catch (e) { clearResult(); error(e.name === 'TimeoutError' ? 'This is taking too long. Please try again.' : e.message || 'Please check your connection and try again.'); }
   finally { busy = false; $('result-loading').hidden = true; controls.forEach(c => c.disabled = false); updateButton(); }
 });
