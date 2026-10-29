@@ -16,7 +16,13 @@ Default: port 3100, loopback interface. `PORT` and `HOST` can override these. Ca
 
 ## Connect real AI scoring
 
-Set these securely in the server environment, then restart:
+For local use, copy `.env.example` to `.env` in the project folder, then enter your API key in that local file. `npm start` and `npm run dev` load it automatically, so you do not need to re-enter the key each time. In Windows PowerShell, use `npm.cmd start` if script execution is restricted.
+
+`.env` is excluded from Git and is never served by the website. It stores the key as plain text on your computer: keep it private, and never upload it or include it in screenshots. Only `.env.example`, which contains no key, belongs in GitHub. Replace any key you have shared publicly or in chat.
+
+Environment variables already set in your terminal take precedence over `.env`. If you previously entered an old key with `$env:WATCH_AI_KEY`, open a fresh terminal or run `Remove-Item Env:WATCH_AI_KEY -ErrorAction SilentlyContinue` before restarting.
+
+Configuration options:
 
 - `WATCH_AI_KEY`: API credential. Never put this in frontend code or commit it.
 - `WATCH_AI_BASE_URL`: optional HTTPS OpenAI-compatible base URL, default `https://api.openai.com/v1`.
