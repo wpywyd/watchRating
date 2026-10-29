@@ -8,3 +8,22 @@ test('unconfigured site serves independently and never invents a score', async t
 test('valid photo reaches provider; score is computed with equal weights', async t => { let sent; const app=await serve(t,{key:'test-key',fetchImpl:async(url,options)=>{sent=JSON.parse(options.body); return Response.json({choices:[{message:{content:JSON.stringify(assessment)}}]});}}); const res=await app.post({image,medium:'sketch',notes:'A playful design'}); assert.equal(res.status,200); const data=await res.json(); assert.equal(data.score,72); assert.equal(sent.messages[1].content[1].image_url.url,image); assert.equal(sent.response_format.type,'json_schema'); });
 test('invalid images, cross-origin calls, and malformed AI scores are rejected', async t => { const app=await serve(t,{key:'test',fetchImpl:async()=>Response.json({choices:[{message:{content:'{}'}}]})}); assert.equal((await app.post({image:'data:image/png;base64,AAAA',medium:'sketch',notes:''})).status,400); assert.equal((await app.post({image,medium:'sketch',notes:''},{Origin:'https://another-site.test'})).status,403); assert.equal((await app.post({image,medium:'sketch',notes:''})).status,502); assert.throws(()=>validateAssessment({...assessment,ratings:{...assessment.ratings,creativity:{score:101,feedback:''}}})); });
 test('non-watch image receives no score and provider errors do not leak details', async t => { const rejected={...assessment,assessable:false,ratings:null,reason:'Please include a watch design.'}; const app=await serve(t,{key:'test',fetchImpl:async()=>Response.json({choices:[{message:{content:JSON.stringify(rejected)}}]})}); const data=await(await app.post({image,medium:'model',notes:''})).json(); assert.deepEqual(data,{assessable:false,reason:'Please include a watch design.'}); const broken=await serve(t,{key:'secret',fetchImpl:async()=>new Response('private provider detail',{status:401})}); const res=await broken.post({image,medium:'sketch',notes:''}); assert.equal(res.status,502); assert.doesNotMatch(await res.text(),/private provider detail|secret/); });
+test('provider failures distinguish quota, credentials, model access and rate limits safely', async t => {
+  for (const [status, code, expected] of [
+    [429, 'insufficient_quota', /no available API credit/],
+    [401, 'invalid_api_key', /rejected the API key/],
+    [404, 'model_not_found', /model or endpoint is unavailable/],
+    [403, null, /Access to the AI service was denied/],
+    [429, 'rate_limit_exceeded', /Wait a minute/],
+    [400, null, /rejected the review format/],
+    [503, null, /temporarily unable/]
+  ]) {
+    const app = await serve(t, { key: 'private-key-value', fetchImpl: async () => Response.json({ error: { code, message: 'private provider detail' } }, { status }) });
+    const response = await app.post({ image, medium: 'sketch', notes: '' });
+    assert.equal(response.status, 502);
+    const data = await response.json();
+    assert.equal(data.providerStatus, status);
+    assert.match(data.error, expected);
+    assert.doesNotMatch(JSON.stringify(data), /private provider detail|private-key-value/);
+  }
+});

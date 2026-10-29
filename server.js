@@ -59,7 +59,29 @@ export function createApp({ key = process.env.WATCH_AI_KEY, base = process.env.W
           method: 'POST', signal: AbortSignal.timeout(60_000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, max_tokens: 1800, messages: [{ role: 'system', content: instructions }, { role: 'user', content: [{ type: 'text', text: JSON.stringify({ medium: body.medium, studentNotes: body.notes }) }, { type: 'image_url', image_url: { url: body.image, detail: 'high' } }] }], response_format: { type: 'json_schema', json_schema: { name: 'watch_assessment', strict: true, schema } } })
         });
-        if (!upstream.ok) return json(502, { error: 'The AI service could not complete this review. Please try again later or ask the site owner to check its configuration.' });
+        if (!upstream.ok) {
+          // Map provider errors to our own messages; never expose raw provider output.
+          let failure = {};
+          try { failure = await upstream.json(); } catch {}
+          const code = failure?.error?.code;
+          let message;
+          if (code === 'insufficient_quota' || code === 'billing_hard_limit_reached' || upstream.status === 402) {
+            message = 'The AI account has no available API credit or has reached its spending limit. Check API billing and project limits at platform.openai.com if you use OpenAI. ChatGPT subscriptions do not include API credit.';
+          } else if (upstream.status === 401) {
+            message = 'The AI service rejected the API key. Set WATCH_AI_KEY to a valid key for your configured provider, then restart the server. Never share the key in chat or commit it to GitHub.';
+          } else if (code === 'model_not_found' || upstream.status === 404) {
+            message = 'The configured AI model or endpoint is unavailable. Check WATCH_AI_BASE_URL and WATCH_AI_MODEL. For OpenAI, use https://api.openai.com/v1 and an image-capable model available to your API project (default: gpt-4.1-mini), then restart the server.';
+          } else if (upstream.status === 403) {
+            message = 'Access to the AI service was denied. Check the API project permissions, model access, and any network access restrictions.';
+          } else if (upstream.status === 429) {
+            message = 'The AI service has reached a request or usage limit. Wait a minute and try again. If this continues, check your API account billing and rate limits.';
+          } else if (upstream.status === 400 || upstream.status === 422) {
+            message = 'The AI service rejected the review format. Use a model and endpoint that support image input and strict JSON-schema output. Check WATCH_AI_BASE_URL and WATCH_AI_MODEL, then restart the server.';
+          } else {
+            message = 'The AI service is temporarily unable to complete the review. Please try again later.';
+          }
+          return json(502, { error: message, providerStatus: upstream.status });
+        }
         const result = await upstream.json();
         let assessment;
         try { assessment = validateAssessment(JSON.parse(result.choices?.[0]?.message?.content)); } catch { return json(502, { error: 'The AI returned an incomplete assessment. Please try again.' }); }
